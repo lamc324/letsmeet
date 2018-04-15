@@ -3,13 +3,56 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+    <android.support.v4.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/drawer_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/map"
-        tools:context=".MapsActivity"
-        android:name="com.google.android.gms.maps.SupportMapFragment" />
+        tools:context=".MainActivity" >
+
+        <FrameLayout
+            android:id="@+id/main"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" >
+        </FrameLayout>
+
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/listOnline2"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignBottom="@+id/ic_magnify"
+
+            android:layout_below="@id/toolBar"></android.support.v7.widget.RecyclerView>
+
+
+
+        <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+
+
+
+            xmlns:tools="http://schemas.android.com/tools"
+
+
+
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:id="@+id/map"
+            tools:context=".MapsActivity"
+            android:name="com.google.android.gms.maps.SupportMapFragment">
+
+
+
+
+
+        </fragment>
+
+    </android.support.v4.widget.DrawerLayout>
+
+
+
+
+
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -40,6 +83,8 @@
             android:background="@null"
             android:hint="Ingrese Direccion, Ciudad o Codigo Postal"
             android:imeOptions="actionSearch"/>
+
+
     
     </RelativeLayout>
 
@@ -73,5 +118,7 @@
         android:scaleType="centerCrop"
         android:id="@+id/place_info"
         android:src="@drawable/ic_info"/>
+
+
 
 </RelativeLayout>
