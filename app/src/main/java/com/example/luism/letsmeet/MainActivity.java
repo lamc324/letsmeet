@@ -4,8 +4,12 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -31,6 +35,14 @@ public class MainActivity extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
 
+    private Boolean mLocationPermissionsGranted = false;
+
+    private static final String FINE_LOCATION = android.Manifest.permission.ACCESS_FINE_LOCATION;
+
+    private static final String COURSE_LOCATION = android.Manifest.permission.ACCESS_COARSE_LOCATION;
+
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1234;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,7 +52,8 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
 
         if(isServicesOK()){
-            statusCheck();
+            getLocationPermission();
+
         }
     }
 
@@ -58,8 +71,16 @@ public class MainActivity extends AppCompatActivity {
 
                 );
 
-                //Intent intent = new Intent(MainActivity.this, MapsActivity.class);
-                //startActivity(intent);
+            }
+        });
+
+        Button botonAutores = (Button) findViewById(R.id.btnAuthors);
+
+        botonAutores.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intento = new Intent(getApplicationContext(), AuthorsActivity.class);
+                startActivity(intento);
             }
         });
     }
@@ -78,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
             Intent intent = new Intent(MainActivity.this,MapsActivity.class);
             startActivity(intent);
             finish();
+
 
         } else{
             Toast.makeText(this,"Login failed !!!", Toast.LENGTH_SHORT).show();
@@ -102,9 +124,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
                     public void onClick(final DialogInterface dialog, final int id) {
                         startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                        //Intent intent = new Intent(MainActivity.this,MapsActivity.class);
-                        //startActivity(intent);
-                        //finish();
+
                     }
                 })
                 .setNegativeButton("No", new DialogInterface.OnClickListener() {
@@ -136,4 +156,67 @@ public class MainActivity extends AppCompatActivity {
         }
         return false;
     }
+
+    private void getLocationPermission() {
+        Log.d(TAG, "getLocationPermission: getting location permissions");
+        String[] permissions = {android.Manifest.permission.ACCESS_FINE_LOCATION,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION};
+
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                    COURSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                mLocationPermissionsGranted = true;
+
+                // Despues de revisar los permisos, resume la app
+                // revisa que el gps este activado
+                statusCheck();
+
+
+            } else {
+                ActivityCompat.requestPermissions(this,
+                        permissions,
+                        LOCATION_PERMISSION_REQUEST_CODE);
+            }
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    permissions,
+                    LOCATION_PERMISSION_REQUEST_CODE);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        Log.d(TAG, "onRequestPermissionsResult: called.");
+        mLocationPermissionsGranted = false;
+
+        switch (requestCode) {
+            case LOCATION_PERMISSION_REQUEST_CODE: {
+                if (grantResults.length > 0) {
+                    for (int i = 0; i < grantResults.length; i++) {
+                        if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                            mLocationPermissionsGranted = false;
+                            Log.d(TAG, "onRequestPermissionsResult: permission failed");
+                            finish();
+                            return;
+                        }
+                    }
+                    Log.d(TAG, "onRequestPermissionsResult: permission granted");
+                    mLocationPermissionsGranted = true;
+
+                    // Despues de revisar los permisos, resume la app
+                    // revisa que el gps este activado
+                    statusCheck();
+
+
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void onResume(){
+        super.onResume();
+        statusCheck();
+    };
 }

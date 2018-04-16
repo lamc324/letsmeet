@@ -575,22 +575,6 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
     private void updateList() {
 
-
-        query.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
-
-                }
-
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-
-            }
-        });
-
         options =
                 new FirebaseRecyclerOptions.Builder<User>()
                         .setQuery(counterRef, User.class)
@@ -649,20 +633,6 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
 
         };
-
-
-        ///TESTING
-        /*loadLocationForThisUser("merlyn@gmail.com");
-        lat = 65.9667;
-        lng =-18.5333;
-
-        loadLocationForThisUser("john@gmail.com");
-        lat = 65.9637;
-        lng = -18.5333;
-
-        loadLocationForThisUser("morgan@gmail.com");
-        lat = 65.9627;
-        lng = -18.5333;*/
 
         adapter.notifyDataSetChanged();
         listOnline.setAdapter(adapter);
@@ -728,7 +698,6 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             public void onCancelled(DatabaseError databaseError) {
 
             }
-
 
         });
     }
