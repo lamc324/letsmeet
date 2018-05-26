@@ -2,6 +2,7 @@ package com.example.luism.letsmeet;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
@@ -17,6 +18,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.widget.DrawerLayout;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -33,6 +35,8 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -68,6 +72,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -79,6 +84,7 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 public class MapsActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, OnMapReadyCallback,
@@ -97,7 +103,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
     //widgets
     private AutoCompleteTextView mSearchText;
-    private ImageView mGps, mInfo, mPlacePicker;
+    private ImageView mGps, mInfo, mPlacePicker,mGrupos;
 
     //vars
     private Boolean mLocationPermissionsGranted = false;
@@ -112,8 +118,8 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
     ///// --------------- ListOnline.java --------------------
     //// ---------------- Todo lo de Firebase -----------------
     //Firebase
-    DatabaseReference onlineRef, currentUserRef, counterRef, locations;
-    FirebaseRecyclerAdapter<User, ListOnlineViewHolder> adapter;
+    DatabaseReference onlineRef, currentUserRef, counterRef, locations, groups, currentUserGroup,usersMarkers,actualUserMarker;
+    //FirebaseRecyclerAdapter<User, ListOnlineViewHolder> adapter;
     FirebaseRecyclerOptions<User> options;
 
     //View
@@ -123,6 +129,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
     private LocationRequest mLocationRequest;
 
     private String email;
+    private String nombreGrupo;
     Double lat = 0.0;
     Double lng = 0.0;
 
@@ -138,6 +145,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
     LocationListener locationListener;
     BitmapDescriptor icon;
     HashMap<String,Marker> hashMarkers = new HashMap<>();
+    HashMap<String,Marker> friendsMarkers = new HashMap<>();
     ///// --------------- Menu lateral desplegable ------------------------
     final String[] data = {"Mostrar Usuarios", "Salir"};
 
@@ -155,6 +163,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         mGps = (ImageView) findViewById(R.id.ic_gps);
         mInfo = (ImageView) findViewById(R.id.place_info);
         mPlacePicker = (ImageView) findViewById(R.id.place_picker);
+        mGrupos = (ImageView) findViewById(R.id.ic_grupos);
 
         getLocationPermission();
 
@@ -208,6 +217,25 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         counterRef = FirebaseDatabase.getInstance().getReference("lastOnline");
         currentUserRef = FirebaseDatabase.getInstance().getReference("lastOnline")
                 .child(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        currentUserGroup = FirebaseDatabase.getInstance().getReference("Grupos")
+                .child(FirebaseAuth.getInstance().getCurrentUser().getUid());
+
+        nombreGrupo = getIntent().getStringExtra("room_name");
+        if(nombreGrupo != null){
+
+            groups = FirebaseDatabase.getInstance().getReference("Grupos").child(nombreGrupo);
+            currentUserGroup = FirebaseDatabase.getInstance().getReference("Grupos").child(nombreGrupo)
+                    .child(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        } else{
+            groups = FirebaseDatabase.getInstance().getReference("Grupos").child("NULO");
+        }
+
+        usersMarkers = FirebaseDatabase.getInstance().getReference("Marcadores");
+
+        actualUserMarker = FirebaseDatabase.getInstance().getReference("Marcadores")
+                .child(FirebaseAuth.getInstance().getCurrentUser().getUid());
+
+
 
 
         createLocationRequest();
@@ -220,7 +248,6 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
         //LA LATITUD Y LA LONGITUD NECESARIAS PARA ESTE METODO
         //SE CALCULAN EN EL getDeviceLocation();
-        updateList();
 
 
         //// ---------------- Inicializar menu Desplegable ---------------------
@@ -274,6 +301,14 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             public void onClick(View v) {
                 Log.d(TAG, "onClick: clicked gps icon");
                 getDeviceLocation();
+            }
+        });
+
+        mGrupos.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(getApplicationContext(),GruposActivity.class);
+                startActivity(intent);
             }
         });
 
@@ -418,11 +453,20 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
                 mMarker = mMap.addMarker(options);
 
+                usersMarkers.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                        .setValue(new Marcador(FirebaseAuth.getInstance().getCurrentUser()
+                                .getEmail(), String.valueOf(latLng.latitude),String.valueOf(latLng.longitude)));
+
+
             } catch (NullPointerException e) {
                 Log.e(TAG, "moveCamera: NullPointerException: " + e.getMessage());
             }
         } else {
             mMap.addMarker(new MarkerOptions().position(latLng));
+
+            usersMarkers.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                    .setValue(new Marcador(FirebaseAuth.getInstance().getCurrentUser()
+                            .getEmail(), String.valueOf(latLng.latitude),String.valueOf(latLng.longitude)));
         }
 
         hideSoftKeyboard();
@@ -459,7 +503,15 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
                     COURSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 mLocationPermissionsGranted = true;
+
+
+
+
                 initMap();
+
+
+
+
             } else {
                 ActivityCompat.requestPermissions(this,
                         permissions,
@@ -573,70 +625,6 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     }
 
-    private void updateList() {
-
-        options =
-                new FirebaseRecyclerOptions.Builder<User>()
-                        .setQuery(counterRef, User.class)
-                        .build();
-
-        final DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        final RecyclerView navList = (RecyclerView) findViewById(R.id.listOnline2);
-
-        adapter = new FirebaseRecyclerAdapter<User, ListOnlineViewHolder>(
-                options
-        ) {
-            @Override
-            protected void onBindViewHolder(@NonNull ListOnlineViewHolder holder, int position, @NonNull User model) {
-                holder.txtEmail.setText(model.getEmail());
-                if (!model.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
-
-
-                    //Clear all old markers
-                    //mMap.clear();
-
-                    email = model.getEmail();
-                    //lat = mLastLocation.getLatitude();
-                    //lng = mLastLocation.getLongitude();
-                    if (!TextUtils.isEmpty(email)) {
-                        loadLocationForThisUser(email);
-                    }
-
-                }
-
-                //implemnting itemclick inside recyclerview
-                holder.itemClickListener = new ItemClickListener() {
-                    @Override
-                    public void onClick(View view, int position) {
-                        drawer.setDrawerListener(new DrawerLayout.SimpleDrawerListener() {
-                            @Override
-                            public void onDrawerClosed(View drawerView) {
-                                super.onDrawerClosed(drawerView);
-
-                            }
-                        });
-                        drawer.closeDrawer(listOnline);
-                    }
-                };
-
-                holder.setItemClickListener(holder.itemClickListener);
-            }
-
-            @NonNull
-            @Override
-            public ListOnlineViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-
-                View view = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.user_layout, parent, false);
-                return new ListOnlineViewHolder(view);
-            }
-
-
-        };
-
-        adapter.notifyDataSetChanged();
-        listOnline.setAdapter(adapter);
-    }
 
     private void loadLocationForThisUser(String email) {
         Query user_location = locations.orderByChild("email").equalTo(email);
@@ -733,7 +721,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
                     counterRef.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                             .setValue(new User(FirebaseAuth.getInstance().getCurrentUser()
                                     .getEmail(), "Online"));
-                    adapter.notifyDataSetChanged();
+                    //adapter.notifyDataSetChanged();
                 }
             }
 
@@ -746,10 +734,67 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         counterRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
+                /*for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
 
                     User user = postSnapshot.getValue(User.class);
+                    if(user.getStatus().equals("Online") && !user.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
+                        email = user.getEmail();
+                        loadLocationForThisUser(email);
+                    }
                     Log.d("LOG", "" + user.getEmail() + " is " + user.getStatus());
+                }*/
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        groups.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                currentUserGroup.onDisconnect().removeValue();
+                recuperarUsuariodeSnapshot(dataSnapshot);
+
+
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+
+                currentUserGroup.onDisconnect().removeValue();
+                recuperarUsuariodeSnapshot(dataSnapshot);
+
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        usersMarkers.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
+                    actualUserMarker.onDisconnect().removeValue();
+
+                    Marcador user = postSnapshot.getValue(Marcador.class);
+                    if(!user.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
+                        email = user.getEmail();
+                        marcadorDeAmigo(email);
+                    }
                 }
             }
 
@@ -759,7 +804,76 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
 
+        //adapter.notifyDataSetChanged();
 
+
+    }
+
+    private void recuperarUsuariodeSnapshot(DataSnapshot dataSnapshot){
+        Iterator i = dataSnapshot.getChildren().iterator();
+
+        while (i.hasNext()){
+
+            String usuario = (String) ((DataSnapshot)i.next()).getValue();
+            String status = (String) ((DataSnapshot)i.next()).getValue();
+
+            User user = new User(usuario,status);
+            if(user.getStatus().equals("Online") && !user.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
+                email = user.getEmail();
+                loadLocationForThisUser(email);
+            }
+            Log.d("LOG", "" + user.getEmail() + " is " + user.getStatus());
+        }
+    }
+
+    private void marcadorDeAmigo(String email) {
+        Query user_location = usersMarkers.orderByChild("email").equalTo(email);
+
+        user_location.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for (DataSnapshot postSnapshot : dataSnapshot.getChildren()) {
+
+                    Marcador tracking = postSnapshot.getValue(Marcador.class);
+
+                    //Marker for friend location
+                    LatLng freindLocation = new LatLng(Double.parseDouble(tracking.getLatMarcador()),
+                            Double.parseDouble(tracking.getLngMarcador()));
+
+                    //creating location from user coordinates
+                    Location currentUser = new Location("");
+                    currentUser.setLatitude(lat);
+                    currentUser.setLongitude(lng);
+
+                    //creating location from friend location
+                    Location freind = new Location("");
+                    freind.setLongitude(Double.parseDouble(tracking.getLatMarcador()));
+                    freind.setLatitude(Double.parseDouble(tracking.getLngMarcador()));
+
+
+                    //creating function to calculate the distance between two users
+                    distance(currentUser, freind);
+
+                    MarkerOptions marker = new MarkerOptions()
+                            .position(freindLocation)
+                            .title(tracking.getEmail())
+                            .snippet("Distance " + new DecimalFormat("#.#").format((currentUser.distanceTo(freind)) / 1000) + " km")
+                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+
+                    mMap.addMarker(marker);
+
+
+                    //mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat,lng),12.0f));
+
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+
+        });
     }
 
     private void startLocationUpdates() {
@@ -809,20 +923,22 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         super.onStart();
         counterRef.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                 .setValue(new User(FirebaseAuth.getInstance().getCurrentUser().getEmail(), "Online"));
-        adapter.startListening();
+        //adapter.startListening();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        adapter.stopListening();
+        //adapter.stopListening();
     }
 
     @Override
     protected void onDestroy() {
         currentUserRef.removeValue();
+        currentUserGroup.removeValue();
+        actualUserMarker.removeValue();
         super.onDestroy();
-        adapter.stopListening();
+        //adapter.stopListening();
     }
 
     @Override
@@ -840,6 +956,33 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             locationManager.removeUpdates(locationListener);
         }
     }
+
+    // colocar al abrir la clase de la activity
+    @Override
+    public void onBackPressed() {
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("¿Está seguro de que desea cerrar la aplicación?");
+
+
+        builder.setPositiveButton("SI", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                finish();
+            }
+        });
+
+        builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+            }
+        });
+
+        builder.show();
+
+    }
+
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {

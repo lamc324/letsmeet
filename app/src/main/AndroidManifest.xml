@@ -48,7 +48,10 @@
             android:name=".MapsActivity"
             android:label="@string/title_activity_maps" />
         <activity android:name=".ListOnline" />
-        <activity android:name=".AuthorsActivity"></activity>
+        <activity android:name=".AuthorsActivity" />
+        <activity android:name=".models.GruposActivity" />
+        <activity android:name=".GruposActivity" />
+        <activity android:name=".GrupoActualActivity"></activity>
     </application>
 
 </manifest>
