@@ -103,7 +103,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
     //widgets
     private AutoCompleteTextView mSearchText;
-    private ImageView mGps, mInfo, mPlacePicker,mGrupos;
+    private ImageView mGps, mInfo, mPlacePicker,mGrupos,mLimpiar;
 
     //vars
     private Boolean mLocationPermissionsGranted = false;
@@ -145,7 +145,9 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
     LocationListener locationListener;
     BitmapDescriptor icon;
     HashMap<String,Marker> hashMarkers = new HashMap<>();
-    HashMap<String,Marker> friendsMarkers = new HashMap<>();
+    ArrayList<Marker> userMarkers = new ArrayList<>();
+    ArrayList<Marker> friendsMarkers = new ArrayList<>();
+    ArrayList<User> listaDeAmigos = new ArrayList<>();
     ///// --------------- Menu lateral desplegable ------------------------
     final String[] data = {"Mostrar Usuarios", "Salir"};
 
@@ -164,6 +166,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         mInfo = (ImageView) findViewById(R.id.place_info);
         mPlacePicker = (ImageView) findViewById(R.id.place_picker);
         mGrupos = (ImageView) findViewById(R.id.ic_grupos);
+        mLimpiar = (ImageView) findViewById(R.id.ic_limpiarmarcadores);
 
         getLocationPermission();
 
@@ -226,6 +229,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             groups = FirebaseDatabase.getInstance().getReference("Grupos").child(nombreGrupo);
             currentUserGroup = FirebaseDatabase.getInstance().getReference("Grupos").child(nombreGrupo)
                     .child(FirebaseAuth.getInstance().getCurrentUser().getUid());
+            listaDeAmigos.clear();
         } else{
             groups = FirebaseDatabase.getInstance().getReference("Grupos").child("NULO");
         }
@@ -312,6 +316,13 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             }
         });
 
+        mLimpiar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                borrarMarcadores();
+            }
+        });
+
         mInfo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -347,6 +358,39 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         });
 
         hideSoftKeyboard();
+    }
+
+    private void borrarMarcadores(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("¿Limpiar todos los marcadores?");
+
+
+        builder.setPositiveButton("SI", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                for (Marker m : userMarkers) {
+                    Marker mAux = m;
+                    userMarkers.remove(m);
+                    mAux.remove();
+
+                }
+
+                for (i = 0; i < friendsMarkers.size(); i++) {
+                    Marker mAux = friendsMarkers.get(i);
+                    mAux.remove();
+                }
+                friendsMarkers.clear();
+            }
+        });
+
+        builder.setNegativeButton("NO", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+            }
+        });
+
+        builder.show();
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -435,7 +479,12 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
         Log.d(TAG, "moveCamera: moving the camera to: lat: " + latLng.latitude + ", lng: " + latLng.longitude);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
 
-        mMap.clear();
+        //mMap.clear();
+        //LIMPIAR TODOS LOS MARCADORES DEL USUARIO
+        for(Marker m : userMarkers){
+            m.remove();
+            userMarkers.remove(m);
+        }
 
         mMap.setInfoWindowAdapter(new CustomInfoWindowAdapter(MapsActivity.this));
 
@@ -452,6 +501,8 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
                         .snippet(snippet);
 
                 mMarker = mMap.addMarker(options);
+                userMarkers.add(mMarker);
+
 
                 usersMarkers.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                         .setValue(new Marcador(FirebaseAuth.getInstance().getCurrentUser()
@@ -462,7 +513,9 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
                 Log.e(TAG, "moveCamera: NullPointerException: " + e.getMessage());
             }
         } else {
-            mMap.addMarker(new MarkerOptions().position(latLng));
+            Marker otroMarker = mMap.addMarker(new MarkerOptions().position(latLng));
+
+            userMarkers.add(otroMarker);
 
             usersMarkers.child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                     .setValue(new Marcador(FirebaseAuth.getInstance().getCurrentUser()
@@ -480,7 +533,8 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
             MarkerOptions options = new MarkerOptions()
                     .position(latLng)
                     .title(title);
-            mMap.addMarker(options);
+            Marker otroMarker = mMap.addMarker(options);
+            userMarkers.add(otroMarker);
         }
 
         hideSoftKeyboard();
@@ -792,8 +846,14 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
                     Marcador user = postSnapshot.getValue(Marcador.class);
                     if(!user.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
-                        email = user.getEmail();
-                        marcadorDeAmigo(email);
+                        for(User u : listaDeAmigos) {
+                            if(u.getEmail().equals(user.getEmail())) {
+
+
+                                email = user.getEmail();
+                                marcadorDeAmigo(email);
+                            }
+                        }
                     }
                 }
             }
@@ -819,6 +879,7 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
 
             User user = new User(usuario,status);
             if(user.getStatus().equals("Online") && !user.getEmail().equals(FirebaseAuth.getInstance().getCurrentUser().getEmail())) {
+                listaDeAmigos.add(user);
                 email = user.getEmail();
                 loadLocationForThisUser(email);
             }
@@ -860,7 +921,8 @@ public class MapsActivity extends AppCompatActivity implements GoogleApiClient.C
                             .snippet("Distance " + new DecimalFormat("#.#").format((currentUser.distanceTo(freind)) / 1000) + " km")
                             .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
 
-                    mMap.addMarker(marker);
+                    Marker otroMarker = mMap.addMarker(marker);
+                    friendsMarkers.add(otroMarker);
 
 
                     //mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat,lng),12.0f));
